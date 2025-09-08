@@ -2,7 +2,6 @@ import symengine
 from symengine import Symbol
 
 from hobotan import *
-##計算重いから自己ループ削除
 
 def symb(num, Species, MDcmp, cmp):
 
@@ -89,3 +88,4 @@ def symb(num, Species, MDcmp, cmp):
   lsum = [t_list, MD_list, X_list]
 
   return local_vars, Symbols, lsum, moji_list
+

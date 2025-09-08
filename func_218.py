@@ -5,13 +5,11 @@ from hobotan import *
 
 def symb(num, Species, MDcmp, cmp):
 
-  #文字の設定
   moji_list = []
   N = []
   for n in range(num):
     mj = "I" * (n + 1)
     N.append(mj)
-  #性能用
   for i in N:
     for s in Species:
       moji = "u_" + str(i) + s
@@ -88,4 +86,5 @@ def symb(num, Species, MDcmp, cmp):
   lsum = [t_list, MD_list, X_list]
 
   return local_vars, Symbols, lsum, moji_list
+
 

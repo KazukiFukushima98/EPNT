@@ -148,7 +148,13 @@ def emergency_swap_setup(swap_size_gb=400):  # 64GBに変更
 
 # 実行部分も修正
 print("Executing emergency swap setup...")
-swap_success = emergency_swap_setup(64)  # 64GBに変更
+
+import platform
+
+if platform.system() == 'Linux':
+    swap_success = emergency_swap_setup(64)
+else:
+    swap_success = False
 
 if swap_success:
     print("Large swap activated. Setting up memory monitoring...")

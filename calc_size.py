@@ -147,72 +147,7 @@ def emergency_swap_setup(swap_size_gb=400):  # 64GBに変更
 
 
 # 実行部分も修正
-print("Executing emergency swap setup...")
 
-import platform
-
-if platform.system() == 'Linux':
-    swap_success = emergency_swap_setup(64)
-else:
-    swap_success = False
-
-if swap_success:
-    print("Large swap activated. Setting up memory monitoring...")
-
-
-    # Memory monitoring function for large swap usage
-    def setup_memory_monitoring():
-        """Setup memory monitoring for large swap scenarios"""
-        try:
-            import threading
-            import time
-
-            def monitor_memory():
-                max_memory = 0
-                max_swap = 0
-                start_time = time.time()
-
-                while True:
-                    try:
-                        # Process memory
-                        process = psutil.Process()
-                        memory_mb = process.memory_info().rss / (1024 ** 2)
-                        max_memory = max(max_memory, memory_mb)
-
-                        # System swap
-                        swap = psutil.swap_memory()
-                        swap_gb = swap.used / (1024 ** 3)
-                        max_swap = max(max_swap, swap_gb)
-
-                        # Alert levels
-                        if memory_mb > 10000:  # 10GB
-                            elapsed = time.time() - start_time
-                            print(
-                                f"HIGH MEMORY: {memory_mb:.0f}MB RAM, {swap_gb:.1f}GB swap used ({elapsed / 60:.1f}min elapsed)")
-
-                        if swap.percent > 25:  # 25% swap usage
-                            print(f"SWAP USAGE: {swap.percent:.1f}% ({swap_gb:.1f}GB used)")
-
-                        time.sleep(30)  # Check every 30 seconds
-
-                    except:
-                        break
-
-            monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
-            monitor_thread.start()
-            print("Memory monitoring started (30-second intervals)")
-
-        except Exception as e:
-            print(f"Memory monitoring setup failed: {e}")
-
-
-    setup_memory_monitoring()
-
-else:
-    print("CRITICAL: Large swap setup failed.")
-    response = input("Continue with limited memory? (y/N): ")
-    if response.lower() != 'y':
-        exit(1)
 
 
 # emergency_swap_setup(64)  # 64GB
@@ -936,21 +871,12 @@ def analyze_individual_c_elements(C, sym):
 
             if amplify_expr is not None:
                 try:
-                    def model_timeout_handler(signum, frame):
-                        raise TimeoutError("Model creation timeout")
-
-                    signal.signal(signal.SIGALRM, model_timeout_handler)
-                    signal.alarm(30)
-
                     model = Model(amplify_expr)
-                    signal.alarm(0)
 
                     element_result['input_vars'] = model.num_input_vars
 
                     try:
-                        signal.alarm(10)
                         element_result['logical_vars'] = model.num_logical_vars
-                        signal.alarm(0)
 
                         element_result['conversion_successful'] = True
                         successful_conversions += 1
@@ -960,25 +886,20 @@ def analyze_individual_c_elements(C, sym):
                         print(f"  Logical vars: {element_result['logical_vars']}")
 
                     except TimeoutError:
-                        signal.alarm(0)
                         print(f"  Logical vars acquisition timeout")
                         element_result['error'] = "Logical vars timeout"
 
                         try:
-                            signal.alarm(5)
                             logical_matrix, _ = model.logical_matrix
-                            signal.alarm(0)
                             if logical_matrix is not None:
                                 element_result['logical_vars'] = len(logical_matrix)
                                 element_result['conversion_successful'] = True
                                 total_logical_vars += element_result['logical_vars']
                                 print(f"  Logical vars (estimated): {element_result['logical_vars']}")
                         except:
-                            signal.alarm(0)
                             print(f"  Logical matrix estimation also failed")
 
                 except TimeoutError:
-                    signal.alarm(0)
                     print(f"  Model creation timeout")
                     element_result['error'] = "Model creation timeout"
 
@@ -987,7 +908,6 @@ def analyze_individual_c_elements(C, sym):
                 element_result['error'] = "Amplify conversion failed"
 
         except Exception as e:
-            signal.alarm(0)
             print(f"  Error: {e}")
             element_result['error'] = str(e)
 
@@ -1337,6 +1257,70 @@ def main_individual_analysis():
 
 # === Main execution starts here ===
 def main():
+    print("Executing emergency swap setup...")
+
+    import platform
+
+    if platform.system() == 'Linux':
+        swap_success = emergency_swap_setup(64)
+    else:
+        swap_success = False
+
+    if swap_success:
+        print("Large swap activated. Setting up memory monitoring...")
+
+        # Memory monitoring function for large swap usage
+        def setup_memory_monitoring():
+            """Setup memory monitoring for large swap scenarios"""
+            try:
+                import threading
+                import time
+
+                def monitor_memory():
+                    max_memory = 0
+                    max_swap = 0
+                    start_time = time.time()
+
+                    while True:
+                        try:
+                            # Process memory
+                            process = psutil.Process()
+                            memory_mb = process.memory_info().rss / (1024 ** 2)
+                            max_memory = max(max_memory, memory_mb)
+
+                            # System swap
+                            swap = psutil.swap_memory()
+                            swap_gb = swap.used / (1024 ** 3)
+                            max_swap = max(max_swap, swap_gb)
+
+                            # Alert levels
+                            if memory_mb > 10000:  # 10GB
+                                elapsed = time.time() - start_time
+                                print(
+                                    f"HIGH MEMORY: {memory_mb:.0f}MB RAM, {swap_gb:.1f}GB swap used ({elapsed / 60:.1f}min elapsed)")
+
+                            if swap.percent > 25:  # 25% swap usage
+                                print(f"SWAP USAGE: {swap.percent:.1f}% ({swap_gb:.1f}GB used)")
+
+                            time.sleep(30)  # Check every 30 seconds
+
+                        except:
+                            break
+
+                monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
+                monitor_thread.start()
+                print("Memory monitoring started (30-second intervals)")
+
+            except Exception as e:
+                print(f"Memory monitoring setup failed: {e}")
+
+        setup_memory_monitoring()
+
+    else:
+        print("CRITICAL: Large swap setup failed.")
+        response = input("Continue with limited memory? (y/N): ")
+        if response.lower() != 'y':
+            exit(1)
     from func_218 import symb
 
     total_time = time.time()
@@ -1614,16 +1598,8 @@ def main():
         # Create QUBO model
         print("Creating BinaryQuadraticModel (this may take a long time)...")
 
-
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Timeout")
-
-
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(3600)  # 1 hour timeout
-
         model = Model(amplify_expr)
-        signal.alarm(0)
+
 
 
 
@@ -1633,7 +1609,6 @@ def main():
 
         # Get logical variables
         print("Getting logical variables count (this is the final step)...")
-        signal.alarm(72000)  # 2 hour timeout
         op = time.time()
         # logical_vars = model.num_logical_vars
         bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
@@ -1641,7 +1616,6 @@ def main():
                                                   quadratization_method="Substitute",
                                                   substitution_multiplier=0.5)
         print(time.time() - op, "s for getting num_var")
-        signal.alarm(0)
         print("num_var", len(im.variables))
 
 
@@ -1650,13 +1624,11 @@ def main():
         #
         final_logical_vars = len(im.variables)
     except TimeoutError:
-        signal.alarm(0)
         print("Analysis timed out. Using fallback estimation...")
         # Fallback based on previous individual results
         final_logical_vars = 500000  # Conservative estimate
 
     except Exception as e:
-        signal.alarm(0)
         print(f"Analysis failed: {e}")
         final_logical_vars = 500000  # Conservative estimate
 

@@ -1676,4 +1676,6 @@ try:
 except:
     pass
 
-print("Combined analysis completed")
+    print("Combined analysis completed")
+if __name__ == '__main__':
+    main()

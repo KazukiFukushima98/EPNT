@@ -1336,345 +1336,346 @@ def main_individual_analysis():
 
 
 # === Main execution starts here ===
-from func_218 import symb
+def main():
+    from func_218 import symb
 
-total_time = time.time()
+    total_time = time.time()
 
-Species = ["A", "B", "C"]
-numcmp = 1
+    Species = ["A", "B", "C"]
+    numcmp = 1
 
-num = 2
-MDcmp = numcmp
-cmp = numcmp
-local, sym, lsum, moji_list = symb(num, Species, MDcmp, cmp)
+    num = 2
+    MDcmp = numcmp
+    cmp = numcmp
+    local, sym, lsum, moji_list = symb(num, Species, MDcmp, cmp)
 
-t_list = lsum[0]
-MD_list = lsum[1]
-X_list = lsum[2]
-globals().update(local)
+    t_list = lsum[0]
+    MD_list = lsum[1]
+    X_list = lsum[2]
+    globals().update(local)
 
-M = [se.zeros(len(Species))] * num
+    M = [se.zeros(len(Species))] * num
 
-B = [se.Matrix([[0.6, 0, 0], [0, 0.1, 0], [0, 0, 0.1]]), se.Matrix([[0.1, 0, 0], [0, 0.6, 0], [0, 0, 0.1]]),
-     se.Matrix([[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.6]])]
+    B = [se.Matrix([[0.6, 0, 0], [0, 0.1, 0], [0, 0, 0.1]]), se.Matrix([[0.1, 0, 0], [0, 0.6, 0], [0, 0, 0.1]]),
+         se.Matrix([[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.6]])]
 
-for n in range(num):
+    for n in range(num):
+        count = 0
+        for s in sym[3 * n:3 + 3 * n]:
+            M[n] += s * B[count]
+            count += 1
+    EYE = se.eye(len(Species))
+
+    P = [0] * num
+    z = len(Species) * num
     count = 0
-    for s in sym[3 * n:3 + 3 * n]:
-        M[n] += s * B[count]
-        count += 1
-EYE = se.eye(len(Species))
+    # P: P11, P41 ...
+    for i in range(num):
+        P[i] = M[0] * sym[z + 2 * num * i] + (EYE - M[0]) * sym[z + 2 * num * i + 1]
+        for n in range(num - 1):
+            pp = P[i].row_join(
+                M[n + 1] * sym[z + 2 * num * i + 2 * n + 2] + (EYE - M[n + 1]) * sym[z + 2 * num * i + 2 * n + 3])
+            P[i] = pp
+            count += 1
 
-P = [0] * num
-z = len(Species) * num
-count = 0
-# P: P11, P41 ...
-for i in range(num):
-    P[i] = M[0] * sym[z + 2 * num * i] + (EYE - M[0]) * sym[z + 2 * num * i + 1]
-    for n in range(num - 1):
-        pp = P[i].row_join(
-            M[n + 1] * sym[z + 2 * num * i + 2 * n + 2] + (EYE - M[n + 1]) * sym[z + 2 * num * i + 2 * n + 3])
-        P[i] = pp
-        count += 1
+    MP = P[0]
+    for i in range(num - 1):
+        MP = MP.col_join(P[i + 1])
+    MP = efficient_expand(MP)
 
-MP = P[0]
-for i in range(num - 1):
-    MP = MP.col_join(P[i + 1])
-MP = efficient_expand(MP)
+    E = se.eye(MP.shape[0])
+    E3 = se.eye(3)
 
-E = se.eye(MP.shape[0])
-E3 = se.eye(3)
+    # Calculate cofactor matrix
+    print("Starting cofactor matrix calculation...")
+    start_time = time.time()
+    Mad = get_cofactor_matrix(E - MP)
+    end_time = time.time()
+    print(f"Cofactor matrix calculation completed: {end_time - start_time:.2f}s")
 
-# Calculate cofactor matrix
-print("Starting cofactor matrix calculation...")
-start_time = time.time()
-Mad = get_cofactor_matrix(E - MP)
-end_time = time.time()
-print(f"Cofactor matrix calculation completed: {end_time - start_time:.2f}s")
+    # Simplify each element
+    print("Simplifying each element of cofactor matrix...")
+    start_time = time.time()
+    for i in range(len(Mad[0, :])):
+        for j in range(len(Mad[:, 0])):
+            Mad[i, j] = simplify_binary_expression(Mad[i, j])
+    end_time = time.time()
+    print(f"Cofactor matrix simplification completed: {end_time - start_time:.2f}s")
 
-# Simplify each element
-print("Simplifying each element of cofactor matrix...")
-start_time = time.time()
-for i in range(len(Mad[0, :])):
-    for j in range(len(Mad[:, 0])):
-        Mad[i, j] = simplify_binary_expression(Mad[i, j])
-end_time = time.time()
-print(f"Cofactor matrix simplification completed: {end_time - start_time:.2f}s")
+    # Calculate and simplify determinant
+    print("Calculating determinant...")
+    start_time = time.time()
+    Mdet = efficient_block_det(efficient_expand(E3 - P[0][0:3, 0:3]), efficient_expand(P[0][0:3, 3:6]),
+                               efficient_expand(P[1][0:3, 0:3]), efficient_expand(E3 - P[1][0:3, 3:6]))
+    end_time = time.time()
+    Mdet = efficient_expand(Mdet)
+    Mdet = simplify_binary_expression(Mdet)
+    print(f"Determinant calculation completed: {end_time - start_time:.2f}s")
 
-# Calculate and simplify determinant
-print("Calculating determinant...")
-start_time = time.time()
-Mdet = efficient_block_det(efficient_expand(E3 - P[0][0:3, 0:3]), efficient_expand(P[0][0:3, 3:6]),
-                           efficient_expand(P[1][0:3, 0:3]), efficient_expand(E3 - P[1][0:3, 3:6]))
-end_time = time.time()
-Mdet = efficient_expand(Mdet)
-Mdet = simplify_binary_expression(Mdet)
-print(f"Determinant calculation completed: {end_time - start_time:.2f}s")
+    MDfin = 1
+    MDET = 0
+    for i in range(MDcmp):
+        MDET += MDfin / (2 ** (MDcmp) - 1) * 2 ** (i) * MD_list[i]
 
-MDfin = 1
-MDET = 0
-for i in range(MDcmp):
-    MDET += MDfin / (2 ** (MDcmp) - 1) * 2 ** (i) * MD_list[i]
+    # Calculate inverse matrix
+    print("Calculating inverse matrix...")
+    start_time = time.time()
+    Minv = Mad * MDET
+    for i in range(len(Minv[0, :])):
+        for j in range(len(Minv[:, 0])):
+            Minv[i, j] = efficient_expand(Minv[i, j])
+    end_time = time.time()
+    print(f"Inverse matrix calculation completed: {end_time - start_time:.2f}s")
 
-# Calculate inverse matrix
-print("Calculating inverse matrix...")
-start_time = time.time()
-Minv = Mad * MDET
-for i in range(len(Minv[0, :])):
-    for j in range(len(Minv[:, 0])):
-        Minv[i, j] = efficient_expand(Minv[i, j])
-end_time = time.time()
-print(f"Inverse matrix calculation completed: {end_time - start_time:.2f}s")
+    F = se.zeros(len(Species), 3 * (num + 1))
+    # Determine flow rates
+    F_list = [100] * len(Species)
+    for i in range(len(Species)):
+        F[i, 0] = F_list[i]
 
-F = se.zeros(len(Species), 3 * (num + 1))
-# Determine flow rates
-F_list = [100] * len(Species)
-for i in range(len(Species)):
-    F[i, 0] = F_list[i]
+    FF = F[:, 0].col_join(se.zeros(3 * (num - 1), 1))
 
-FF = F[:, 0].col_join(se.zeros(3 * (num - 1), 1))
+    print(FF)
 
-print(FF)
+    # Flow calculation
+    print("Calculating flows...")
+    start_time = time.time()
+    FT = Minv * FF
+    FT = efficient_expand(FT)
+    for n in range(num):
+        F[:, 1 + 3 * n] = FT[3 * n: 3 * n + len(Species), 0]
+        F[:, 1 + 3 * n + 1] = M[n] * F[:, 1 + 3 * n]
+        F[:, 1 + 3 * n + 2] = (EYE - M[n]) * F[:, 1 + 3 * n]
+    end_time = time.time()
+    print(f"Flow calculation completed: {end_time - start_time:.2f}s")
 
-# Flow calculation
-print("Calculating flows...")
-start_time = time.time()
-FT = Minv * FF
-FT = efficient_expand(FT)
-for n in range(num):
-    F[:, 1 + 3 * n] = FT[3 * n: 3 * n + len(Species), 0]
-    F[:, 1 + 3 * n + 1] = M[n] * F[:, 1 + 3 * n]
-    F[:, 1 + 3 * n + 2] = (EYE - M[n]) * F[:, 1 + 3 * n]
-end_time = time.time()
-print(f"Flow calculation completed: {end_time - start_time:.2f}s")
+    # Expansion
+    F = efficient_expand(F)
 
-# Expansion
-F = efficient_expand(F)
+    C = []
+    Vl = [100, 50, 10]
+    X = []
+    for n in range(num):
+        X.append(sum(F[:, 3 * n + 2]))
 
-C = []
-Vl = [100, 50, 10]
-X = []
-for n in range(num):
-    X.append(sum(F[:, 3 * n + 2]))
+    Xfin = [0.1, 0.1, 0.1]
 
-Xfin = [0.1, 0.1, 0.1]
+    # Expression calculation with memory-efficient square
+    print("Calculating expressions...")
+    start_time = time.time()
+    for n in range(num):
+        X_sum = 0.005
+        for i in range(cmp):
+            X_sum += Xfin[n] / (2 ** (cmp) - 1) * 2 ** (i) * X_list[i + cmp * n]
+        Fsubs = []
+        for i in range(3):
+            st = time.time()
+            print(f"Starting square calculation for F[{i}, {3 * n + 2}]...")
+            F0 = simplify_binary_expression(F[i, 3 * n + 2])
+            F0 = memory_efficient_square(F0, num_processes=16, threshold=1e-6)
+            print(f"Parallel calculation time: {time.time() - st:.3f}s")
+            Fsubs.append(F0)
 
-# Expression calculation with memory-efficient square
-print("Calculating expressions...")
-start_time = time.time()
-for n in range(num):
-    X_sum = 0.005
-    for i in range(cmp):
-        X_sum += Xfin[n] / (2 ** (cmp) - 1) * 2 ** (i) * X_list[i + cmp * n]
-    Fsubs = []
-    for i in range(3):
-        st = time.time()
-        print(f"Starting square calculation for F[{i}, {3 * n + 2}]...")
-        F0 = simplify_binary_expression(F[i, 3 * n + 2])
-        F0 = memory_efficient_square(F0, num_processes=16, threshold=1e-6)
-        print(f"Parallel calculation time: {time.time() - st:.3f}s")
-        Fsubs.append(F0)
+        D = -(sym[-2 * (num - n) - MDcmp - num * cmp] * (
+                Vl[0] * sym[3 * n] * Fsubs[0] + Vl[1] * sym[3 * n + 1] * Fsubs[1] + Vl[2] * sym[
+            3 * n + 2] * Fsubs[2])) * X_sum
+        C.append(efficient_expand(D))
+    end_time = time.time()
+    print(f"Expression calculation completed: {end_time - start_time:.2f}s")
 
-    D = -(sym[-2 * (num - n) - MDcmp - num * cmp] * (
-            Vl[0] * sym[3 * n] * Fsubs[0] + Vl[1] * sym[3 * n + 1] * Fsubs[1] + Vl[2] * sym[
-        3 * n + 2] * Fsubs[2])) * X_sum
-    C.append(efficient_expand(D))
-end_time = time.time()
-print(f"Expression calculation completed: {end_time - start_time:.2f}s")
+    # Constraints
+    print("Calculating constraint conditions...")
+    start_time = time.time()
+    for i in range(int(2 * num)):
+        D = ((sum(t_list[i::2 * num]) - 1) ** 2)
+        C.append(simplify_binary_expression(efficient_expand(D)))
 
-# Constraints
-print("Calculating constraint conditions...")
-start_time = time.time()
-for i in range(int(2 * num)):
-    D = ((sum(t_list[i::2 * num]) - 1) ** 2)
-    C.append(simplify_binary_expression(efficient_expand(D)))
-
-# Recycle-related constraints
-D = efficient_expand(Mdet * MDET - 1)
-D = simplify_binary_expression(D)
-D = memory_efficient_square(D, num_processes=16, threshold=1e-6)
-D = simplify_binary_expression(D)
-C.append(D)
-
-# Fraction-related constraints
-for n in range(num):
-    X_sum = 0.005
-    for i in range(cmp):
-        X_sum += Xfin[n] / (2 ** (cmp) - 1) * 2 ** (i) * X_list[i + cmp * n]
-    CSD = sym[-2 * (num - n) - MDcmp - num * cmp] * (X_sum * X[n] - 1)
-    if int(n) == int(1):
-        CSD = CSD * (t_24 + t_34 - t_24 * t_34)
-    CSD = efficient_expand(CSD)
-    CSD = simplify_binary_expression(CSD)
-    D = memory_efficient_square(CSD, num_processes=16, threshold=1e-6)
+    # Recycle-related constraints
+    D = efficient_expand(Mdet * MDET - 1)
+    D = simplify_binary_expression(D)
+    D = memory_efficient_square(D, num_processes=16, threshold=1e-6)
+    D = simplify_binary_expression(D)
     C.append(D)
-end_time = time.time()
-print(f"Constraint condition calculation completed: {end_time - start_time:.2f}s")
 
-print("hello")
-# Separator selection constraints
-C.append(simplify_binary_expression(efficient_expand((u_IA + u_IB + u_IC - 1) ** 2)))
-C.append(simplify_binary_expression(efficient_expand((u_IIA + u_IIB + u_IIC - 1) ** 2)))
+    # Fraction-related constraints
+    for n in range(num):
+        X_sum = 0.005
+        for i in range(cmp):
+            X_sum += Xfin[n] / (2 ** (cmp) - 1) * 2 ** (i) * X_list[i + cmp * n]
+        CSD = sym[-2 * (num - n) - MDcmp - num * cmp] * (X_sum * X[n] - 1)
+        if int(n) == int(1):
+            CSD = CSD * (t_24 + t_34 - t_24 * t_34)
+        CSD = efficient_expand(CSD)
+        CSD = simplify_binary_expression(CSD)
+        D = memory_efficient_square(CSD, num_processes=16, threshold=1e-6)
+        C.append(D)
+    end_time = time.time()
+    print(f"Constraint condition calculation completed: {end_time - start_time:.2f}s")
 
-for i in range(len(C) - num):
-    C[i + num] = efficient_expand(C[i + num] * 10 ** 6)
+    print("hello")
+    # Separator selection constraints
+    C.append(simplify_binary_expression(efficient_expand((u_IA + u_IB + u_IC - 1) ** 2)))
+    C.append(simplify_binary_expression(efficient_expand((u_IIA + u_IIB + u_IIC - 1) ** 2)))
 
-print(len(sym))
-print("Total time:", (time.time() - total_time) / 60, "minutes")
-print("Formulation and optimization completed")
-#
-# === Combined Objective Function Analysis ===
-print("\n" + "=" * 60)
-print("COMBINED OBJECTIVE FUNCTION ANALYSIS")
-print("=" * 60)
+    for i in range(len(C) - num):
+        C[i + num] = efficient_expand(C[i + num] * 10 ** 6)
 
-# Create combined objective function
-print("Creating combined objective function from all C elements...")
-objective_function = 0
-for i, c in enumerate(C):
-    print(f"Adding C[{i}] to objective function...")
-    objective_function += c
+    print(len(sym))
+    print("Total time:", (time.time() - total_time) / 60, "minutes")
+    print("Formulation and optimization completed")
+    #
+    # === Combined Objective Function Analysis ===
+    print("\n" + "=" * 60)
+    print("COMBINED OBJECTIVE FUNCTION ANALYSIS")
+    print("=" * 60)
 
-print("Final expansion of combined objective function...")
-objective_function = efficient_expand(objective_function)
+    # Create combined objective function
+    print("Creating combined objective function from all C elements...")
+    objective_function = 0
+    for i, c in enumerate(C):
+        print(f"Adding C[{i}] to objective function...")
+        objective_function += c
 
-# Analyze combined objective function
-print("\n=== Combined Objective Function QUBO Analysis ===")
+    print("Final expansion of combined objective function...")
+    objective_function = efficient_expand(objective_function)
 
-try:
-    # Basic information
-    if objective_function.is_Add:
-        total_terms = len(objective_function.args)
-    else:
-        total_terms = 1
+    # Analyze combined objective function
+    print("\n=== Combined Objective Function QUBO Analysis ===")
 
     try:
-        degree = objective_function.degree()
-    except:
-        degree = 'Unknown'
+        # Basic information
+        if objective_function.is_Add:
+            total_terms = len(objective_function.args)
+        else:
+            total_terms = 1
 
-    print(f"Total terms in combined objective: {total_terms}")
-    print(f"Degree of combined objective: {degree}")
+        try:
+            degree = objective_function.degree()
+        except:
+            degree = 'Unknown'
+
+        print(f"Total terms in combined objective: {total_terms}")
+        print(f"Degree of combined objective: {degree}")
+        print(f"Input variables: {len(sym)}")
+
+        # Create Amplify variable mapping
+        print("Creating Amplify variable mapping...")
+        gen = VariableGenerator()
+        q = gen.array("Binary", len(sym))
+        var_map = {str(sym[i]): q[i] for i in range(len(sym))}
+
+        # Convert to Amplify expression
+        print("Converting to Amplify expression...")
+        amplify_expr = BinaryPoly()
+
+        if objective_function.is_Add:
+            terms = list(objective_function.args)
+        else:
+            terms = [objective_function]
+
+        chunk_size = 1000
+        for i in range(0, len(terms), chunk_size):
+            chunk = terms[i:min(i + chunk_size, len(terms))]
+            print(f"Processing chunk {i // chunk_size + 1}/{(len(terms) + chunk_size - 1) // chunk_size}")
+
+            for term in chunk:
+                coeff = 1.0
+                vars_list = []
+
+                if term.is_Mul:
+                    for factor in term.args:
+                        if factor.is_Number:
+                            coeff *= float(factor)
+                        elif factor.is_Symbol:
+                            vars_list.append(str(factor))
+                        elif hasattr(factor, 'is_Pow') and factor.is_Pow:
+                            vars_list.append(str(factor.args[0]))
+                elif term.is_Symbol:
+                    vars_list.append(str(term))
+                elif term.is_Number:
+                    coeff = float(term)
+
+                if abs(coeff) < COEFFICIENT_THRESHOLD:
+                    continue
+
+                if not vars_list:
+                    amplify_expr += coeff
+                else:
+                    term_expr = coeff
+                    for var in vars_list:
+                        if var in var_map:
+                            term_expr *= var_map[var]
+                    amplify_expr += term_expr
+
+            gc.collect()
+
+        print("Amplify expression created successfully")
+
+        # Create QUBO model
+        print("Creating BinaryQuadraticModel (this may take a long time)...")
+
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Timeout")
+
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3600)  # 1 hour timeout
+
+        model = Model(amplify_expr)
+        signal.alarm(0)
+
+
+
+        # input_vars = model.num_input_vars
+        print(f"Model created successfully")
+        # print(f"Input variables: {input_vars}")
+
+        # Get logical variables
+        print("Getting logical variables count (this is the final step)...")
+        signal.alarm(72000)  # 2 hour timeout
+        op = time.time()
+        # logical_vars = model.num_logical_vars
+        bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
+        im, mapping = model.to_intermediate_model(bq,
+                                                  quadratization_method="Substitute",
+                                                  substitution_multiplier=0.5)
+        print(time.time() - op, "s for getting num_var")
+        signal.alarm(0)
+        print("num_var", len(im.variables))
+
+
+        # print(f"SUCCESS: {logical_vars:,} logical variables")
+        # print(f"Expansion ratio: {logical_vars / input_vars:.2f}x")
+        #
+        final_logical_vars = len(im.variables)
+    except TimeoutError:
+        signal.alarm(0)
+        print("Analysis timed out. Using fallback estimation...")
+        # Fallback based on previous individual results
+        final_logical_vars = 500000  # Conservative estimate
+
+    except Exception as e:
+        signal.alarm(0)
+        print(f"Analysis failed: {e}")
+        final_logical_vars = 500000  # Conservative estimate
+
+    print("\n" + "=" * 60)
+    print("FINAL RESULTS")
+    print("=" * 60)
     print(f"Input variables: {len(sym)}")
+    print(f"Final logical variables: {final_logical_vars:,}")
+    print(f"Expansion ratio: {final_logical_vars / len(sym):.2f}x")
 
-    # Create Amplify variable mapping
-    print("Creating Amplify variable mapping...")
-    gen = VariableGenerator()
-    q = gen.array("Binary", len(sym))
-    var_map = {str(sym[i]): q[i] for i in range(len(sym))}
+    total_end_time = time.time()
+    print(f"\nTotal execution time: {(total_end_time - total_time) / 60:.2f} minutes")
 
-    # Convert to Amplify expression
-    print("Converting to Amplify expression...")
-    amplify_expr = BinaryPoly()
-
-    if objective_function.is_Add:
-        terms = list(objective_function.args)
-    else:
-        terms = [objective_function]
-
-    chunk_size = 1000
-    for i in range(0, len(terms), chunk_size):
-        chunk = terms[i:min(i + chunk_size, len(terms))]
-        print(f"Processing chunk {i // chunk_size + 1}/{(len(terms) + chunk_size - 1) // chunk_size}")
-
-        for term in chunk:
-            coeff = 1.0
-            vars_list = []
-
-            if term.is_Mul:
-                for factor in term.args:
-                    if factor.is_Number:
-                        coeff *= float(factor)
-                    elif factor.is_Symbol:
-                        vars_list.append(str(factor))
-                    elif hasattr(factor, 'is_Pow') and factor.is_Pow:
-                        vars_list.append(str(factor.args[0]))
-            elif term.is_Symbol:
-                vars_list.append(str(term))
-            elif term.is_Number:
-                coeff = float(term)
-
-            if abs(coeff) < COEFFICIENT_THRESHOLD:
-                continue
-
-            if not vars_list:
-                amplify_expr += coeff
-            else:
-                term_expr = coeff
-                for var in vars_list:
-                    if var in var_map:
-                        term_expr *= var_map[var]
-                amplify_expr += term_expr
-
-        gc.collect()
-
-    print("Amplify expression created successfully")
-
-    # Create QUBO model
-    print("Creating BinaryQuadraticModel (this may take a long time)...")
-
-
-    def timeout_handler(signum, frame):
-        raise TimeoutError("Timeout")
-
-
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(3600)  # 1 hour timeout
-
-    model = Model(amplify_expr)
-    signal.alarm(0)
-
-
-
-    # input_vars = model.num_input_vars
-    print(f"Model created successfully")
-    # print(f"Input variables: {input_vars}")
-
-    # Get logical variables
-    print("Getting logical variables count (this is the final step)...")
-    signal.alarm(72000)  # 2 hour timeout
-    op = time.time()
-    # logical_vars = model.num_logical_vars
-    bq = AcceptableDegrees(objective={"Binary": "Quadratic"})
-    im, mapping = model.to_intermediate_model(bq,
-                                              quadratization_method="Substitute",
-                                              substitution_multiplier=0.5)
-    print(time.time() - op, "s for getting num_var")
-    signal.alarm(0)
-    print("num_var", len(im.variables))
-
-
-    # print(f"SUCCESS: {logical_vars:,} logical variables")
-    # print(f"Expansion ratio: {logical_vars / input_vars:.2f}x")
-    #
-    final_logical_vars = len(im.variables)
-except TimeoutError:
-    signal.alarm(0)
-    print("Analysis timed out. Using fallback estimation...")
-    # Fallback based on previous individual results
-    final_logical_vars = 500000  # Conservative estimate
-
-except Exception as e:
-    signal.alarm(0)
-    print(f"Analysis failed: {e}")
-    final_logical_vars = 500000  # Conservative estimate
-
-print("\n" + "=" * 60)
-print("FINAL RESULTS")
-print("=" * 60)
-print(f"Input variables: {len(sym)}")
-print(f"Final logical variables: {final_logical_vars:,}")
-print(f"Expansion ratio: {final_logical_vars / len(sym):.2f}x")
-
-total_end_time = time.time()
-print(f"\nTotal execution time: {(total_end_time - total_time) / 60:.2f} minutes")
-
-try:
-    process = psutil.Process()
-    final_memory = process.memory_info().rss / 1024 / 1024
-    print(f"Final memory usage: {final_memory:.1f} MB")
-except:
-    pass
+    try:
+        process = psutil.Process()
+        final_memory = process.memory_info().rss / 1024 / 1024
+        print(f"Final memory usage: {final_memory:.1f} MB")
+    except:
+        pass
 
     print("Combined analysis completed")
 if __name__ == '__main__':
